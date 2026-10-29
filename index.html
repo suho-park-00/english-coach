@@ -6,10 +6,10 @@
   <title>NexaSilicon English Study</title>
 
   <!-- PWA & Mobile Web App Meta Tags -->
-  <meta name="theme-color" content="#0284c7">
+  <meta name="theme-color" content="#0f172a">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="EnglishCoach">
 
   <!-- Manifest & Icons -->
@@ -145,7 +145,7 @@
       }
     }
 
-    // Dynamic Safe-Area Measuring Probe
+    // Dynamic Safe-Area Measuring Probe with iPhone 16 Pro Rounded-Edge & Home Bar Clearance
     function getSafeInsetBottom() {
       const probe = document.createElement('div');
       probe.style.cssText = 'position:fixed;bottom:0;left:0;right:0;height:0;padding-bottom:env(safe-area-inset-bottom);visibility:hidden;pointer-events:none;';
@@ -153,20 +153,30 @@
       const computed = window.getComputedStyle(probe).paddingBottom;
       document.body.removeChild(probe);
       const pxVal = parseInt(computed, 10);
-      return (!isNaN(pxVal) && pxVal > 0) ? computed : '34px';
+      // iPhone 16 Pro has a 55pt corner radius. A standard 34px inset leaves text too close to the curved corners.
+      // 40px ensures the tab labels are lifted into the flat screen area (52pt clearance from physical bottom).
+      const safeBottom = (!isNaN(pxVal) && pxVal >= 40) ? pxVal : 40;
+      return safeBottom + 'px';
     }
 
-    // Measure physical full screen height on mobile devices without status-bar subtraction
+    // Measure physical full screen height on mobile devices
     function getDeviceFullHeight() {
+      const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
       const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || (navigator.maxTouchPoints > 1);
+
       if (!isMobile) {
         return window.innerHeight || document.documentElement.clientHeight || 0;
       }
-      const isLandscape = Math.abs(window.orientation || 0) === 90 || window.innerWidth > window.innerHeight;
-      const sH = window.screen ? window.screen.height : 0;
-      const sW = window.screen ? window.screen.width : 0;
-      const physicalHeight = isLandscape ? Math.min(sH, sW) : Math.max(sH, sW);
-      return Math.max(physicalHeight, window.innerHeight || 0);
+
+      if (isStandalone) {
+        const isLandscape = Math.abs(window.orientation || 0) === 90 || window.innerWidth > window.innerHeight;
+        const sH = window.screen ? window.screen.height : 0;
+        const sW = window.screen ? window.screen.width : 0;
+        const physicalHeight = isLandscape ? Math.min(sH, sW) : Math.max(sH, sW);
+        return Math.max(physicalHeight, window.innerHeight || 0);
+      } else {
+        return window.innerHeight || document.documentElement.clientHeight || 0;
+      }
     }
 
     // Full-Bleed Viewport & Iframe Synchronization
@@ -180,15 +190,21 @@
       }
       frame.style.width = '100vw';
 
-      // Send host safe-area-inset-bottom to child iframe
-      try {
-        if (frame.contentWindow) {
-          frame.contentWindow.postMessage({
-            type: 'PWA_SAFE_AREA',
-            bottom: getSafeInsetBottom()
-          }, '*');
-        }
-      } catch (e) {}
+      // Send host safe-area-inset-bottom (with corner-radius buffer) to child iframe with staggered sync
+      const sendSafeArea = () => {
+        try {
+          if (frame && frame.contentWindow) {
+            frame.contentWindow.postMessage({
+              type: 'PWA_SAFE_AREA',
+              bottom: getSafeInsetBottom()
+            }, '*');
+          }
+        } catch (e) {}
+      };
+
+      sendSafeArea();
+      setTimeout(sendSafeArea, 400);
+      setTimeout(sendSafeArea, 1200);
     }
 
     window.addEventListener('resize', syncIframeMetrics);
