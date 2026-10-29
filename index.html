@@ -200,6 +200,15 @@
 
     // PWA Service Worker Registration & Real-time Update Check
     if ('serviceWorker' in navigator) {
+      // Auto-reload when a new service worker takes control (instant update)
+      let refreshing = false;
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (!refreshing) {
+          refreshing = true;
+          window.location.reload();
+        }
+      });
+
       window.addEventListener('load', () => {
         navigator.serviceWorker.register('./sw.js')
           .then(reg => {
