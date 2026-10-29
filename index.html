@@ -46,11 +46,8 @@
       right: 0;
       bottom: 0;
       width: 100vw;
-      /* Full bleed stretch on iOS PWA with safe area fallback */
-      height: 100%;
-      height: -webkit-fill-available;
-      height: calc(100% + env(safe-area-inset-bottom, 0px));
-      height: calc(100dvh + env(safe-area-inset-bottom, 0px));
+      height: 100vh;
+      min-height: 100%;
       border: none;
       margin: 0;
       padding: 0;
@@ -159,32 +156,27 @@
       return (!isNaN(pxVal) && pxVal > 0) ? computed : '34px';
     }
 
+    // Measure physical full screen height on mobile devices without status-bar subtraction
+    function getDeviceFullHeight() {
+      const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || (navigator.maxTouchPoints > 1);
+      if (!isMobile) {
+        return window.innerHeight || document.documentElement.clientHeight || 0;
+      }
+      const isLandscape = Math.abs(window.orientation || 0) === 90 || window.innerWidth > window.innerHeight;
+      const sH = window.screen ? window.screen.height : 0;
+      const sW = window.screen ? window.screen.width : 0;
+      const physicalHeight = isLandscape ? Math.min(sH, sW) : Math.max(sH, sW);
+      return Math.max(physicalHeight, window.innerHeight || 0);
+    }
+
     // Full-Bleed Viewport & Iframe Synchronization
     function syncIframeMetrics() {
       const frame = document.getElementById('appFrame');
       if (!frame) return;
 
-      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-      const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
-
-      let trueHeight = window.innerHeight || document.documentElement.clientHeight;
-      if (isIOS && isStandalone) {
-        const probe = document.createElement('div');
-        probe.style.cssText = 'position:fixed;bottom:0;left:0;right:0;height:0;padding-bottom:env(safe-area-inset-bottom);visibility:hidden;pointer-events:none;';
-        document.body.appendChild(probe);
-        const safeBottomPx = parseInt(window.getComputedStyle(probe).paddingBottom, 10) || 0;
-        document.body.removeChild(probe);
-
-        const screenH = (window.screen && window.screen.height) ? window.screen.height : 0;
-        if (screenH > trueHeight && (screenH - trueHeight) < 180) {
-          trueHeight = screenH;
-        } else if (safeBottomPx > 0) {
-          trueHeight = trueHeight + safeBottomPx;
-        }
-      }
-
-      if (trueHeight > 0) {
-        frame.style.height = trueHeight + 'px';
+      const targetHeight = getDeviceFullHeight();
+      if (targetHeight > 0) {
+        frame.style.height = targetHeight + 'px';
       }
       frame.style.width = '100vw';
 
