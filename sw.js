@@ -1,4 +1,4 @@
-const CACHE_NAME = 'english-coach-pwa-v2';
+const CACHE_NAME = 'english-coach-pwa-v3';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
@@ -24,15 +24,27 @@ self.addEventListener('activate', event => {
   );
 });
 
-// Fetch handler required for Chrome PWA / WebAPK installation
+// Network-First for HTML navigation to ensure instantaneous updates
 self.addEventListener('fetch', event => {
-  // Let iframe and live GAS API requests pass through cleanly
-  if (event.request.mode === 'navigate') {
+  const isNav = event.request.mode === 'navigate' || 
+                event.request.url.includes('index.html') || 
+                event.request.url.endsWith('/english-coach/') ||
+                event.request.url.endsWith('/english-coach');
+
+  if (isNav) {
     event.respondWith(
-      fetch(event.request).catch(() => caches.match('./index.html'))
+      fetch(event.request).then(response => {
+        if (response && response.status === 200) {
+          const clone = response.clone();
+          caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
+        }
+        return response;
+      }).catch(() => caches.match('./index.html') || caches.match('./'))
     );
     return;
   }
+
+  // Cache-First for static assets (icons, manifest)
   event.respondWith(
     caches.match(event.request).then(cachedResponse => {
       return cachedResponse || fetch(event.request);

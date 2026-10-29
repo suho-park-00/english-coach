@@ -28,35 +28,35 @@
       padding: 0;
       width: 100%;
       height: 100%;
-      height: 100dvh;
       overflow: hidden;
-      background-color: #0f172a;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Malgun Gothic", sans-serif;
-      -webkit-text-size-adjust: 100%;
-    }
-    #appFrameContainer {
       position: fixed;
       top: 0;
       left: 0;
       right: 0;
       bottom: 0;
-      width: 100%;
-      height: 100%;
-      height: 100dvh;
-      overflow-y: auto;
-      -webkit-overflow-scrolling: touch;
-      z-index: 10;
       background-color: #0f172a;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Malgun Gothic", sans-serif;
+      -webkit-text-size-adjust: 100%;
+      touch-action: manipulation;
     }
     #appFrame {
-      width: 100%;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      width: 100vw;
+      /* Full bleed stretch on iOS PWA with safe area fallback */
       height: 100%;
-      min-height: 100%;
+      height: -webkit-fill-available;
+      height: calc(100% + env(safe-area-inset-bottom, 0px));
+      height: calc(100dvh + env(safe-area-inset-bottom, 0px));
       border: none;
       margin: 0;
       padding: 0;
       display: block;
       background-color: #0f172a;
+      z-index: 10;
     }
     #loadingOverlay {
       position: fixed;
@@ -70,8 +70,9 @@
       justify-content: center;
       background: radial-gradient(circle at 50% 35%, #1e293b 0%, #0f172a 100%);
       color: #ffffff;
-      z-index: 5;
+      z-index: 50;
       transition: opacity 0.4s ease;
+      pointer-events: none;
     }
     .spinner {
       width: 44px;
@@ -120,17 +121,15 @@
     <div style="font-size: 13px; color: #94a3b8; margin-top: 6px;">AI Companion 로딩 중...</div>
   </div>
 
-  <!-- Real Fullscreen GAS Web App with all microphone / camera permissions -->
-  <div id="appFrameContainer">
-    <iframe
-      id="appFrame"
-      src="https://script.google.com/macros/s/AKfycbyYGKuvLPeQIhS0Zax55ULiC_L2owXYXIKNI0fYU0CVrUu8QHWdFquWJkIf51k7t-4ciw/exec"
-      allow="camera; microphone; geolocation; clipboard-write; autoplay; fullscreen"
-      sandbox="allow-forms allow-modals allow-popups allow-popups-to-escape-sandbox allow-same-origin allow-scripts allow-downloads"
-      onload="hideLoading()"
-      scrolling="yes"
-    ></iframe>
-  </div>
+  <!-- Real Fullscreen GAS Web App (Direct Full-Bleed Embedding) -->
+  <iframe
+    id="appFrame"
+    src="https://script.google.com/macros/s/AKfycbyYGKuvLPeQIhS0Zax55ULiC_L2owXYXIKNI0fYU0CVrUu8QHWdFquWJkIf51k7t-4ciw/exec"
+    allow="camera; microphone; geolocation; clipboard-write; autoplay; fullscreen"
+    sandbox="allow-forms allow-modals allow-popups allow-popups-to-escape-sandbox allow-same-origin allow-scripts allow-downloads"
+    onload="hideLoading(); syncIframeMetrics();"
+    scrolling="yes"
+  ></iframe>
 
   <!-- 1-Click Install Button (Visible in browser mode only) -->
   <div id="installBar" onclick="triggerInstall()">
@@ -149,11 +148,72 @@
       }
     }
 
-    // PWA Service Worker Registration
+    // Dynamic Safe-Area Measuring Probe
+    function getSafeInsetBottom() {
+      const probe = document.createElement('div');
+      probe.style.cssText = 'position:fixed;bottom:0;left:0;right:0;height:0;padding-bottom:env(safe-area-inset-bottom);visibility:hidden;pointer-events:none;';
+      document.body.appendChild(probe);
+      const computed = window.getComputedStyle(probe).paddingBottom;
+      document.body.removeChild(probe);
+      const pxVal = parseInt(computed, 10);
+      return (!isNaN(pxVal) && pxVal > 0) ? computed : '34px';
+    }
+
+    // Full-Bleed Viewport & Iframe Synchronization
+    function syncIframeMetrics() {
+      const frame = document.getElementById('appFrame');
+      if (!frame) return;
+
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+      const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
+
+      let trueHeight = window.innerHeight || document.documentElement.clientHeight;
+      if (isIOS && isStandalone) {
+        const probe = document.createElement('div');
+        probe.style.cssText = 'position:fixed;bottom:0;left:0;right:0;height:0;padding-bottom:env(safe-area-inset-bottom);visibility:hidden;pointer-events:none;';
+        document.body.appendChild(probe);
+        const safeBottomPx = parseInt(window.getComputedStyle(probe).paddingBottom, 10) || 0;
+        document.body.removeChild(probe);
+
+        const screenH = (window.screen && window.screen.height) ? window.screen.height : 0;
+        if (screenH > trueHeight && (screenH - trueHeight) < 180) {
+          trueHeight = screenH;
+        } else if (safeBottomPx > 0) {
+          trueHeight = trueHeight + safeBottomPx;
+        }
+      }
+
+      if (trueHeight > 0) {
+        frame.style.height = trueHeight + 'px';
+      }
+      frame.style.width = '100vw';
+
+      // Send host safe-area-inset-bottom to child iframe
+      try {
+        if (frame.contentWindow) {
+          frame.contentWindow.postMessage({
+            type: 'PWA_SAFE_AREA',
+            bottom: getSafeInsetBottom()
+          }, '*');
+        }
+      } catch (e) {}
+    }
+
+    window.addEventListener('resize', syncIframeMetrics);
+    window.addEventListener('orientationchange', () => setTimeout(syncIframeMetrics, 200));
+    window.addEventListener('pageshow', syncIframeMetrics);
+    window.addEventListener('load', syncIframeMetrics);
+    document.addEventListener('DOMContentLoaded', syncIframeMetrics);
+    syncIframeMetrics();
+
+    // PWA Service Worker Registration & Real-time Update Check
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
         navigator.serviceWorker.register('./sw.js')
-          .then(reg => console.log('PWA ServiceWorker registered:', reg.scope))
+          .then(reg => {
+            console.log('PWA ServiceWorker registered:', reg.scope);
+            reg.update(); // Trigger proactive update check
+          })
           .catch(err => console.error('PWA ServiceWorker registration failed:', err));
       });
     }
@@ -163,7 +223,6 @@
     const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
 
     window.addEventListener('beforeinstallprompt', (e) => {
-      // Prevent automatic mini-infobar on mobile
       e.preventDefault();
       deferredPrompt = e;
       if (!isStandalone) {
