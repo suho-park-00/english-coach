@@ -9,7 +9,7 @@
   <meta name="theme-color" content="#0284c7">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="EnglishCoach">
 
   <!-- Manifest & Icons -->
@@ -28,21 +28,34 @@
       padding: 0;
       width: 100%;
       height: 100%;
+      height: 100dvh;
       overflow: hidden;
       background-color: #0f172a;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Malgun Gothic", sans-serif;
+      -webkit-text-size-adjust: 100%;
     }
-    #appFrame {
+    #appFrameContainer {
       position: fixed;
       top: 0;
       left: 0;
+      right: 0;
+      bottom: 0;
       width: 100%;
       height: 100%;
+      height: 100dvh;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      z-index: 10;
+      background-color: #0f172a;
+    }
+    #appFrame {
+      width: 100%;
+      height: 100%;
+      min-height: 100%;
       border: none;
       margin: 0;
       padding: 0;
-      overflow: hidden;
-      z-index: 10;
+      display: block;
       background-color: #0f172a;
     }
     #loadingOverlay {
@@ -108,13 +121,16 @@
   </div>
 
   <!-- Real Fullscreen GAS Web App with all microphone / camera permissions -->
-  <iframe
-    id="appFrame"
-    src="https://script.google.com/macros/s/AKfycbyYGKuvLPeQIhS0Zax55ULiC_L2owXYXIKNI0fYU0CVrUu8QHWdFquWJkIf51k7t-4ciw/exec"
-    allow="camera; microphone; geolocation; clipboard-write; autoplay; fullscreen"
-    sandbox="allow-forms allow-modals allow-popups allow-popups-to-escape-sandbox allow-same-origin allow-scripts allow-downloads"
-    onload="hideLoading()"
-  ></iframe>
+  <div id="appFrameContainer">
+    <iframe
+      id="appFrame"
+      src="https://script.google.com/macros/s/AKfycbyYGKuvLPeQIhS0Zax55ULiC_L2owXYXIKNI0fYU0CVrUu8QHWdFquWJkIf51k7t-4ciw/exec"
+      allow="camera; microphone; geolocation; clipboard-write; autoplay; fullscreen"
+      sandbox="allow-forms allow-modals allow-popups allow-popups-to-escape-sandbox allow-same-origin allow-scripts allow-downloads"
+      onload="hideLoading()"
+      scrolling="yes"
+    ></iframe>
+  </div>
 
   <!-- 1-Click Install Button (Visible in browser mode only) -->
   <div id="installBar" onclick="triggerInstall()">

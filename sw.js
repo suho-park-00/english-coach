@@ -1,4 +1,4 @@
-const CACHE_NAME = 'english-coach-pwa-v1';
+const CACHE_NAME = 'english-coach-pwa-v2';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
