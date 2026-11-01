@@ -9,7 +9,7 @@
   <meta name="theme-color" content="#0f172a">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
   <meta name="apple-mobile-web-app-title" content="EnglishCoach">
 
   <!-- Manifest & Icons -->
@@ -40,14 +40,14 @@
       touch-action: manipulation;
     }
     #appFrame {
-      position: fixed;
+      position: absolute;
       top: 0;
       left: 0;
       right: 0;
       bottom: 0;
-      width: 100vw;
-      height: 100vh;
-      min-height: 100%;
+      width: 100%;
+      height: 100%;
+      height: 100dvh;
       border: none;
       margin: 0;
       padding: 0;
@@ -121,7 +121,7 @@
   <!-- Real Fullscreen GAS Web App (Direct Full-Bleed Embedding) -->
   <iframe
     id="appFrame"
-    src="https://script.google.com/macros/s/AKfycbyYGKuvLPeQIhS0Zax55ULiC_L2owXYXIKNI0fYU0CVrUu8QHWdFquWJkIf51k7t-4ciw/exec"
+    src="https://script.google.com/macros/s/AKfycbyYGKuvLPeQIhS0Zax55ULiC_L2owXYXIKNI0fYU0CVrUu8QHWdFquWJkIf51k7t-4ciw/exec?v=80"
     allow="camera; microphone; geolocation; clipboard-write; autoplay; fullscreen"
     sandbox="allow-forms allow-modals allow-popups allow-popups-to-escape-sandbox allow-same-origin allow-scripts allow-downloads"
     onload="hideLoading(); syncIframeMetrics();"
@@ -145,66 +145,25 @@
       }
     }
 
-    // Dynamic Safe-Area Measuring Probe with iPhone 16 Pro Rounded-Edge & Home Bar Clearance
-    function getSafeInsetBottom() {
-      const probe = document.createElement('div');
-      probe.style.cssText = 'position:fixed;bottom:0;left:0;right:0;height:0;padding-bottom:env(safe-area-inset-bottom);visibility:hidden;pointer-events:none;';
-      document.body.appendChild(probe);
-      const computed = window.getComputedStyle(probe).paddingBottom;
-      document.body.removeChild(probe);
-      const pxVal = parseInt(computed, 10);
-      // iPhone 16 Pro has a 55pt corner radius. A standard 34px inset leaves text too close to the curved corners.
-      // 40px ensures the tab labels are lifted into the flat screen area (52pt clearance from physical bottom).
-      const safeBottom = (!isNaN(pxVal) && pxVal >= 40) ? pxVal : 40;
-      return safeBottom + 'px';
-    }
-
-    // Measure physical full screen height on mobile devices
-    function getDeviceFullHeight() {
-      const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
-      const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || (navigator.maxTouchPoints > 1);
-
-      if (!isMobile) {
-        return window.innerHeight || document.documentElement.clientHeight || 0;
-      }
-
-      if (isStandalone) {
-        const isLandscape = Math.abs(window.orientation || 0) === 90 || window.innerWidth > window.innerHeight;
-        const sH = window.screen ? window.screen.height : 0;
-        const sW = window.screen ? window.screen.width : 0;
-        const physicalHeight = isLandscape ? Math.min(sH, sW) : Math.max(sH, sW);
-        return Math.max(physicalHeight, window.innerHeight || 0);
-      } else {
-        return window.innerHeight || document.documentElement.clientHeight || 0;
-      }
-    }
-
     // Full-Bleed Viewport & Iframe Synchronization
     function syncIframeMetrics() {
       const frame = document.getElementById('appFrame');
       if (!frame) return;
 
-      const targetHeight = getDeviceFullHeight();
-      if (targetHeight > 0) {
-        frame.style.height = targetHeight + 'px';
+      // In iOS standalone PWA and mobile Safari, the actual visible window height
+      // is visualViewport.height or window.innerHeight.
+      // NEVER use screen.height (874px), which is the total hardware display.
+      // Sizing the iframe to screen.height pushes the bottom 54px off-screen on iPhone!
+      const visibleHeight = (window.visualViewport && window.visualViewport.height)
+        ? window.visualViewport.height
+        : (window.innerHeight || document.documentElement.clientHeight || 0);
+
+      if (visibleHeight > 0) {
+        frame.style.height = visibleHeight + 'px';
+      } else {
+        frame.style.height = '100%';
       }
       frame.style.width = '100vw';
-
-      // Send host safe-area-inset-bottom (with corner-radius buffer) to child iframe with staggered sync
-      const sendSafeArea = () => {
-        try {
-          if (frame && frame.contentWindow) {
-            frame.contentWindow.postMessage({
-              type: 'PWA_SAFE_AREA',
-              bottom: getSafeInsetBottom()
-            }, '*');
-          }
-        } catch (e) {}
-      };
-
-      sendSafeArea();
-      setTimeout(sendSafeArea, 400);
-      setTimeout(sendSafeArea, 1200);
     }
 
     window.addEventListener('resize', syncIframeMetrics);
